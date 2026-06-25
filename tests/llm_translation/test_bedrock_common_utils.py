@@ -243,3 +243,36 @@ class TestBedrockTokenCounter:
             contents=None,
         )
         assert result is None
+
+class TestIsClaudeOnBedrock:
+    """Tests for is_claude_4_5_on_bedrock function."""
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "anthropic.claude-sonnet-4-5-20251001-v1:0",
+            "anthropic.claude-haiku-4-5-20251001-v1:0",
+            "anthropic.claude-opus-4-5-20251001-v1:0",
+            "anthropic.claude-sonnet-4-6-20260201-v1:0",
+            "anthropic.claude-opus-4-6-20260201-v1:0",
+            "anthropic.claude-opus-4-7-20260301-v1:0",
+            "anthropic.claude-opus-4-8-20260401-v1:0",
+            "us.anthropic.claude-opus-4-8-20260401-v1:0",
+        ],
+    )
+    def test_returns_true_for_supported_models(self, model):
+        from litellm.llms.bedrock.common_utils import is_claude_4_5_on_bedrock
+        assert is_claude_4_5_on_bedrock(model) is True
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "anthropic.claude-3-sonnet-20240229-v1:0",
+            "anthropic.claude-3-opus-20240229-v1:0",
+            "anthropic.claude-3-5-sonnet-20241022-v2:0",
+            "anthropic.claude-opus-4-9-20260501-v1:0",
+        ],
+    )
+    def test_returns_false_for_unsupported_models(self, model):
+        from litellm.llms.bedrock.common_utils import is_claude_4_5_on_bedrock
+        assert is_claude_4_5_on_bedrock(model) is False
