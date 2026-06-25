@@ -1,7 +1,7 @@
 """
 Cerebras Chat Completions API
 
-this is OpenAI compatible - no translation needed / occurs
+Mostly OpenAI compatible; does not support tools and response_format together.
 """
 
 from typing import Optional
@@ -84,9 +84,23 @@ class CerebrasConfig(OpenAIGPTConfig):
         drop_params: bool,
     ) -> dict:
         supported_openai_params = self.get_supported_openai_params(model=model)
+        # Cerebras rejects requests that include both tools and response_format.
+        # When both are present, convert response_format into an extra tool call
+        # so structured output still works alongside user-provided tools.
+        is_tools_set = any(
+            param == "tools" and value is not None
+            for param, value in non_default_params.items()
+        )
         for param, value in non_default_params.items():
             if param == "max_completion_tokens":
                 optional_params["max_tokens"] = value
+            elif param == "response_format" and is_tools_set:
+                optional_params = self._add_response_format_to_tools(
+                    optional_params=optional_params,
+                    value=value,
+                    is_response_format_supported=False,
+                    enforce_tool_choice=False,
+                )
             elif param in supported_openai_params:
                 optional_params[param] = value
         return optional_params
