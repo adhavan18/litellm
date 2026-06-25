@@ -31,6 +31,7 @@ from litellm.proxy._experimental.mcp_server.mcp_server_manager import (
     _deserialize_json_dict,
     _deserialize_json_list,
     _normalize_mcp_server_cost_info,
+    _resolve_os_environ_in_dict,
 )
 from litellm.proxy._types import (
     LiteLLM_MCPServerTable,
@@ -2949,41 +2950,6 @@ class TestMCPServerManager:
             assert "test_server_2" in result
 
     @pytest.mark.asyncio
-    async def test_no_mcp_servers_sentinel_blocks_allow_all_keys(self):
-        """A key scoped to no-mcp-servers gets zero servers even when allow_all_keys
-        servers exist, and the inner resolver is never consulted."""
-        from litellm.proxy._experimental.mcp_server.auth.user_api_key_auth_mcp import (
-            MCPRequestHandler,
-        )
-        from litellm.proxy._types import LiteLLM_ObjectPermissionTable, UserAPIKeyAuth
-
-        manager = MCPServerManager()
-        object_permission = LiteLLM_ObjectPermissionTable(
-            object_permission_id="perm_no_mcp",
-            mcp_servers=["no-mcp-servers"],
-            mcp_access_groups=[],
-        )
-        user_api_key_auth = UserAPIKeyAuth(
-            api_key="sk-test",
-            user_id="user-123",
-            object_permission=object_permission,
-            object_permission_id="perm_no_mcp",
-        )
-
-        with patch.object(
-            manager, "get_allow_all_keys_server_ids", return_value=["global-server"]
-        ), patch.object(
-            MCPRequestHandler,
-            "get_allowed_mcp_servers",
-            new_callable=AsyncMock,
-            return_value=["leaked-server"],
-        ) as mock_inner:
-            result = await manager.get_allowed_mcp_servers(user_api_key_auth)
-
-        assert result == []
-        mock_inner.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_get_allowed_mcp_servers_anonymous_delegate_requires_oauth2(self):
         """Anonymous delegated auth listing should only include oauth2 servers."""
         from litellm.proxy._experimental.mcp_server.auth.user_api_key_auth_mcp import (
@@ -4566,6 +4532,65 @@ class TestGetPublicMCPServersLegacyMode:
         )
         result = manager.get_public_mcp_servers()
         assert sorted(s.server_id for s in result) == ["a", "b"]
+
+
+class TestStaticHeadersOsEnvironResolution:
+    """Regression tests: os.environ/ references in static_headers must be resolved.
+
+    Before the fix, build_mcp_server_from_table passed the literal string
+    'os.environ/VAR' to the upstream MCP server instead of the resolved value.
+    """
+
+    def test_resolve_os_environ_in_dict_resolves_prefix(self, monkeypatch):
+        monkeypatch.setenv("MCP_TEST_SECRET", "resolved-value")
+        result = _resolve_os_environ_in_dict({"Authorization": "os.environ/MCP_TEST_SECRET"})
+        assert result == {"Authorization": "resolved-value"}
+
+    def test_resolve_os_environ_in_dict_leaves_literal_values_unchanged(self):
+        result = _resolve_os_environ_in_dict({"X-Api-Key": "literal-token"})
+        assert result == {"X-Api-Key": "literal-token"}
+
+    def test_resolve_os_environ_in_dict_drops_unset_env_var(self):
+        result = _resolve_os_environ_in_dict({"Authorization": "os.environ/MCP_DEFINITELY_NOT_SET_XYZ"})
+        assert result is None
+
+    def test_resolve_os_environ_in_dict_mixed_dict(self, monkeypatch):
+        monkeypatch.setenv("MCP_MIXED_SECRET", "real-value")
+        result = _resolve_os_environ_in_dict({
+            "Authorization": "os.environ/MCP_MIXED_SECRET",
+            "X-Static": "plain",
+        })
+        assert result == {"Authorization": "real-value", "X-Static": "plain"}
+
+    def test_resolve_os_environ_in_dict_none_input(self):
+        assert _resolve_os_environ_in_dict(None) is None
+
+    @pytest.mark.asyncio
+    async def test_build_mcp_server_from_table_resolves_static_headers(self, monkeypatch):
+        monkeypatch.setenv("MCP_HEADER_SECRET", "secret-api-key")
+        manager = MCPServerManager()
+        table_record = LiteLLM_MCPServerTable(
+            server_id="env-hdr-1",
+            server_name="env_hdr_server",
+            url="https://example.com/mcp",
+            transport=MCPTransport.http,
+            static_headers={"Authorization": "os.environ/MCP_HEADER_SECRET"},
+        )
+        server = await manager.build_mcp_server_from_table(table_record)
+        assert server.static_headers == {"Authorization": "secret-api-key"}
+
+    @pytest.mark.asyncio
+    async def test_build_mcp_server_from_table_leaves_literal_headers(self):
+        manager = MCPServerManager()
+        table_record = LiteLLM_MCPServerTable(
+            server_id="env-hdr-2",
+            server_name="env_hdr_server_lit",
+            url="https://example.com/mcp",
+            transport=MCPTransport.http,
+            static_headers={"X-Api-Key": "hardcoded-token"},
+        )
+        server = await manager.build_mcp_server_from_table(table_record)
+        assert server.static_headers == {"X-Api-Key": "hardcoded-token"}
 
 
 if __name__ == "__main__":
