@@ -80,7 +80,6 @@ from litellm.proxy._types import (
     MCPEnvVar,
     MCPTransport,
     MCPTransportType,
-    SpecialMCPServerNames,
     UserAPIKeyAuth,
 )
 from litellm.proxy.auth.ip_address_utils import IPAddressUtils
@@ -328,6 +327,30 @@ def _deserialize_json_dict(data: Any) -> Optional[Dict[str, str]]:
     else:
         # Already a dictionary
         return data
+
+
+def _resolve_os_environ_in_dict(
+    headers: Optional[Dict[str, str]],
+) -> Optional[Dict[str, str]]:
+    if not headers:
+        return headers
+    from litellm.secret_managers.main import get_secret_str
+
+    resolved: Dict[str, str] = {}
+    for k, v in headers.items():
+        if v.startswith("os.environ/"):
+            secret = get_secret_str(v)
+            if secret is not None:
+                resolved[k] = secret
+            else:
+                verbose_logger.warning(
+                    "MCP static_headers: env var '%s' not set; header '%s' dropped",
+                    v,
+                    k,
+                )
+        else:
+            resolved[k] = v
+    return resolved or None
 
 
 def _deserialize_json_list(data: Any) -> Optional[List[Dict[str, Any]]]:
@@ -1060,8 +1083,8 @@ class MCPServerManager:
     ) -> MCPServer:
         _mcp_info: MCPInfo = mcp_server.mcp_info or {}
         env_dict = _deserialize_json_dict(getattr(mcp_server, "env", None))
-        static_headers_dict = _deserialize_json_dict(
-            getattr(mcp_server, "static_headers", None)
+        static_headers_dict = _resolve_os_environ_in_dict(
+            _deserialize_json_dict(getattr(mcp_server, "static_headers", None))
         )
         env_vars_list = self._resolve_env_vars_list(
             mcp_server,
@@ -1350,17 +1373,6 @@ class MCPServerManager:
         allow_all_server_ids = self.get_allow_all_keys_server_ids()
 
         try:
-            # The key explicitly opted out of every MCP server. Return zero before
-            # layering on allow_all_keys servers so the opt-out is absolute.
-            key_object_permission = (
-                user_api_key_auth.object_permission if user_api_key_auth else None
-            )
-            if key_object_permission is not None and (
-                SpecialMCPServerNames.no_mcp_servers.value
-                in (key_object_permission.mcp_servers or [])
-            ):
-                return []
-
             # Check if object_permission.mcp_servers is explicitly set
             has_explicit_object_permission = False
             if user_api_key_auth and user_api_key_auth.object_permission:
@@ -1433,11 +1445,8 @@ class MCPServerManager:
                     "No allowed MCP Servers found for user api key auth."
                 )
             return list(combined_servers)
-        except Exception:  # noqa: BLE001
-            verbose_logger.exception(
-                "Failed to get allowed MCP servers; team-level object_permission "
-                "grants may be dropped. Falling back to global servers only."
-            )
+        except Exception as e:
+            verbose_logger.warning(f"Failed to get allowed MCP servers: {str(e)}.")
             return allow_all_server_ids
 
     async def resolve_toolset_tool_permissions(
@@ -3370,7 +3379,7 @@ class MCPServerManager:
             )
         )
 
-    async def _call_regular_mcp_tool(
+    async def _call_regular_mcp_tool(  # noqa: PLR0915
         self,
         mcp_server: MCPServer,
         original_tool_name: str,
