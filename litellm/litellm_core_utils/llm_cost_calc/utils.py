@@ -131,8 +131,10 @@ def _generic_cost_per_character(
             assert (
                 "input_cost_per_character" in model_info
                 and model_info["input_cost_per_character"] is not None
-            ), "model info for model={} does not have 'input_cost_per_character'-pricing\nmodel_info={}".format(
-                model, model_info
+            ), (
+                "model info for model={} does not have 'input_cost_per_character'-pricing\nmodel_info={}".format(
+                    model, model_info
+                )
             )
             custom_prompt_cost = model_info["input_cost_per_character"]
 
@@ -152,8 +154,10 @@ def _generic_cost_per_character(
             assert (
                 "output_cost_per_character" in model_info
                 and model_info["output_cost_per_character"] is not None
-            ), "model info for model={} does not have 'output_cost_per_character'-pricing\nmodel_info={}".format(
-                model, model_info
+            ), (
+                "model info for model={} does not have 'output_cost_per_character'-pricing\nmodel_info={}".format(
+                    model, model_info
+                )
             )
             custom_completion_cost = model_info["output_cost_per_character"]
         completion_cost = completion_characters * custom_completion_cost
@@ -189,6 +193,11 @@ def _get_service_tier_cost_key(base_key: str, service_tier: Optional[str]) -> st
 
     # For any other service tier, use standard pricing
     return base_key
+
+
+def _parse_above_token_threshold(key: str) -> float:
+    threshold_str = key.split("_above_")[1].split("_tokens")[0]
+    return float(threshold_str.replace("k", "")) * (1000 if "k" in threshold_str else 1)
 
 
 def _get_token_base_cost(
@@ -256,15 +265,13 @@ def _get_token_base_cost(
 
     # Only sort the threshold keys (typically 1-2 keys instead of 66+)
     threshold: Optional[float] = None
-    for key in sorted(threshold_keys, reverse=True):
+    for key in sorted(threshold_keys, key=_parse_above_token_threshold, reverse=True):
         value = model_info.get(key)
         if value is not None:
             try:
                 # Handle both formats: _above_128k_tokens and _above_128_tokens
                 threshold_str = key.split("_above_")[1].split("_tokens")[0]
-                threshold = float(threshold_str.replace("k", "")) * (
-                    1000 if "k" in threshold_str else 1
-                )
+                threshold = _parse_above_token_threshold(key)
                 if usage.prompt_tokens > threshold:
                     # Prefer a service_tier-specific above-threshold key when available,
                     # e.g. input_cost_per_token_priority_above_200k_tokens for Gemini
@@ -303,40 +310,54 @@ def _get_token_base_cost(
 
                     # Apply tiered pricing to cache costs
                     cache_creation_tiered_key = (
-                        f"cache_creation_input_token_cost_above_{threshold_str}_tokens"
+                        _get_service_tier_cost_key(
+                            f"cache_creation_input_token_cost_above_{threshold_str}_tokens",
+                            service_tier,
+                        )
+                        if service_tier
+                        else f"cache_creation_input_token_cost_above_{threshold_str}_tokens"
                     )
-                    cache_creation_1hr_tiered_key = f"cache_creation_input_token_cost_above_1hr_above_{threshold_str}_tokens"
+                    cache_creation_1hr_tiered_key = (
+                        _get_service_tier_cost_key(
+                            f"cache_creation_input_token_cost_above_1hr_above_{threshold_str}_tokens",
+                            service_tier,
+                        )
+                        if service_tier
+                        else f"cache_creation_input_token_cost_above_1hr_above_{threshold_str}_tokens"
+                    )
                     cache_read_tiered_key = (
-                        f"cache_read_input_token_cost_above_{threshold_str}_tokens"
+                        _get_service_tier_cost_key(
+                            f"cache_read_input_token_cost_above_{threshold_str}_tokens",
+                            service_tier,
+                        )
+                        if service_tier
+                        else f"cache_read_input_token_cost_above_{threshold_str}_tokens"
                     )
 
-                    if cache_creation_tiered_key in model_info:
-                        cache_creation_cost = cast(
-                            float,
-                            _get_cost_per_unit(
-                                model_info,
-                                cache_creation_tiered_key,
-                                cache_creation_cost,
-                            ),
-                        )
+                    cache_creation_cost = cast(
+                        float,
+                        _get_cost_per_unit(
+                            model_info,
+                            cache_creation_tiered_key,
+                            cache_creation_cost,
+                        ),
+                    )
 
-                    if cache_creation_1hr_tiered_key in model_info:
-                        cache_creation_cost_above_1hr = cast(
-                            float,
-                            _get_cost_per_unit(
-                                model_info,
-                                cache_creation_1hr_tiered_key,
-                                cache_creation_cost_above_1hr,
-                            ),
-                        )
+                    cache_creation_cost_above_1hr = cast(
+                        float,
+                        _get_cost_per_unit(
+                            model_info,
+                            cache_creation_1hr_tiered_key,
+                            cache_creation_cost_above_1hr,
+                        ),
+                    )
 
-                    if cache_read_tiered_key in model_info:
-                        cache_read_cost = cast(
-                            float,
-                            _get_cost_per_unit(
-                                model_info, cache_read_tiered_key, cache_read_cost
-                            ),
-                        )
+                    cache_read_cost = cast(
+                        float,
+                        _get_cost_per_unit(
+                            model_info, cache_read_tiered_key, cache_read_cost
+                        ),
+                    )
 
                     break
             except (IndexError, ValueError):
@@ -464,6 +485,7 @@ class PromptTokensDetailsResult(TypedDict):
     character_count: int
     image_count: int
     video_length_seconds: float
+    audio_length_seconds: float
 
 
 def _parse_prompt_tokens_details(usage: Usage) -> PromptTokensDetailsResult:
@@ -514,6 +536,13 @@ def _parse_prompt_tokens_details(usage: Usage) -> PromptTokensDetailsResult:
         )
         or 0.0
     )
+    audio_length_seconds = (
+        cast(
+            Optional[float],
+            getattr(usage.prompt_tokens_details, "audio_length_seconds", 0),
+        )
+        or 0.0
+    )
 
     return PromptTokensDetailsResult(
         cache_hit_tokens=cache_hit_tokens,
@@ -525,6 +554,7 @@ def _parse_prompt_tokens_details(usage: Usage) -> PromptTokensDetailsResult:
         character_count=character_count,
         image_count=image_count,
         video_length_seconds=float(video_length_seconds),
+        audio_length_seconds=float(audio_length_seconds),
     )
 
 
@@ -646,6 +676,14 @@ def _calculate_input_cost(
             prompt_tokens_details["video_length_seconds"],
         )
 
+    ### AUDIO LENGTH COST
+    if prompt_tokens_details["audio_length_seconds"]:
+        prompt_cost += calculate_cost_component(
+            model_info,
+            "input_cost_per_audio_per_second",
+            prompt_tokens_details["audio_length_seconds"],
+        )
+
     return prompt_cost
 
 
@@ -683,7 +721,7 @@ def _get_regional_uplift_multiplier(
         return 1.0
 
 
-def generic_cost_per_token(  # noqa: PLR0915
+def generic_cost_per_token(
     model: str,
     usage: Usage,
     custom_llm_provider: str,
@@ -722,6 +760,7 @@ def generic_cost_per_token(  # noqa: PLR0915
         character_count=0,
         image_count=0,
         video_length_seconds=0.0,
+        audio_length_seconds=0.0,
     )
     if usage.prompt_tokens_details:
         prompt_tokens_details = _parse_prompt_tokens_details(usage)

@@ -678,7 +678,7 @@ def check_if_part_exists_in_parts(
     return False
 
 
-def _gemini_convert_messages_with_history(  # noqa: PLR0915
+def _gemini_convert_messages_with_history(
     messages: List[AllMessageValues],
     model: Optional[str] = None,
     litellm_params: Optional[dict] = None,
@@ -881,7 +881,9 @@ def _gemini_convert_messages_with_history(  # noqa: PLR0915
             ## MERGE CONSECUTIVE ASSISTANT CONTENT ##
             while msg_i < len(messages) and messages[msg_i]["role"] == "assistant":
                 if isinstance(messages[msg_i], BaseModel):
-                    msg_dict: Union[ChatCompletionAssistantMessage, dict] = messages[msg_i].model_dump()  # type: ignore
+                    msg_dict: Union[ChatCompletionAssistantMessage, dict] = messages[
+                        msg_i
+                    ].model_dump()  # type: ignore
                 else:
                     msg_dict = messages[msg_i]  # type: ignore
                 assistant_msg = ChatCompletionAssistantMessage(**msg_dict)  # type: ignore
@@ -945,7 +947,12 @@ def _gemini_convert_messages_with_history(  # noqa: PLR0915
                         and len(thought_signatures) > 0
                     ):
                         # Use the first signature for the text part (Gemini expects one signature per part)
-                        assistant_content.append(PartType(text=assistant_text, thoughtSignature=thought_signatures[0]))  # type: ignore
+                        assistant_content.append(
+                            PartType(
+                                text=assistant_text,
+                                thoughtSignature=thought_signatures[0],
+                            )
+                        )  # type: ignore
                     else:
                         assistant_content.append(PartType(text=assistant_text))  # type: ignore
 
@@ -1176,7 +1183,7 @@ def _rewrite_google_maps_response_format(data: RequestBody) -> None:
         _rewrite_mime_type_to_response_format(generation_config)
 
 
-def _transform_request_body(  # noqa: PLR0915
+def _transform_request_body(
     messages: List[AllMessageValues],
     model: str,
     optional_params: dict,
@@ -1201,7 +1208,8 @@ def _transform_request_body(  # noqa: PLR0915
         )
         if supports_response_schema is False:
             user_response_schema_message = response_schema_prompt(
-                model=model, response_schema=optional_params.get("response_schema")  # type: ignore
+                model=model,
+                response_schema=optional_params.get("response_schema"),  # type: ignore
             )
             messages.append({"role": "user", "content": user_response_schema_message})
             optional_params.pop("response_schema")

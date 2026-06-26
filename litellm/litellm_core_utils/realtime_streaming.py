@@ -169,7 +169,9 @@ class RealTimeStreaming:
         try:
             event_type = message_obj.get("type", "")
             if event_type in self._SESSION_EVENT_TYPES:
-                typed_obj: OpenAIRealtimeEvents = OpenAIRealtimeStreamSessionEvents(**message_obj)  # type: ignore
+                typed_obj: OpenAIRealtimeEvents = OpenAIRealtimeStreamSessionEvents(
+                    **message_obj
+                )  # type: ignore
             else:
                 # Catch-all base object so unknown/new event names never raise.
                 typed_obj = OpenAIRealtimeStreamResponseBaseObject(**message_obj)  # type: ignore
@@ -1198,7 +1200,7 @@ class RealTimeStreaming:
         item["content"] = new_content
         return item
 
-    async def client_ack_messages(self):  # noqa: PLR0915
+    async def client_ack_messages(self):
         try:
             while True:
                 message = await self.websocket.receive_text()

@@ -5,7 +5,7 @@ from litellm.exceptions import BadRequestError
 from litellm.types.utils import LlmProviders, LlmProvidersSet
 
 
-def get_supported_openai_params(  # noqa: PLR0915
+def get_supported_openai_params(
     model: str,
     custom_llm_provider: Optional[str] = None,
     request_type: Literal[
@@ -86,9 +86,7 @@ def get_supported_openai_params(  # noqa: PLR0915
                 model=model
             )
         elif request_type == "transcription":
-            return litellm.FireworksAIAudioTranscriptionConfig().get_supported_openai_params(
-                model=model
-            )
+            return None
         else:
             return litellm.FireworksAIConfig().get_supported_openai_params(model=model)
     elif custom_llm_provider == "nvidia_nim":
@@ -191,7 +189,9 @@ def get_supported_openai_params(  # noqa: PLR0915
         )
     elif custom_llm_provider == "sambanova":
         if request_type == "embeddings":
-            litellm.SambaNovaEmbeddingConfig().get_supported_openai_params(model=model)
+            return litellm.SambaNovaEmbeddingConfig().get_supported_openai_params(
+                model=model
+            )
         else:
             return litellm.SambanovaConfig().get_supported_openai_params(model=model)
     elif custom_llm_provider == "nebius":

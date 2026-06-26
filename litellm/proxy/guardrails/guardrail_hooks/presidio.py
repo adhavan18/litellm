@@ -28,7 +28,7 @@ from typing import (
 
 import aiohttp
 
-import litellm  # noqa: E401
+import litellm
 from litellm import get_secret
 from litellm._logging import verbose_proxy_logger
 from litellm.types.utils import GenericGuardrailAPIInputs
@@ -93,9 +93,7 @@ class _OPTIONAL_PresidioPIIMasking(CustomGuardrail):
             kwargs["event_hook"] = GuardrailEventHooks.logging_only
         super().__init__(**kwargs)
         self.guardrail_provider = "presidio"
-        self.pii_tokens: dict = (
-            {}
-        )  # mapping of PII token to original text - only used with Presidio `replace` operation
+        self.pii_tokens: dict = {}  # mapping of PII token to original text - only used with Presidio `replace` operation
         self.mock_redacted_text = mock_redacted_text
         self.output_parse_pii = output_parse_pii or False
         self.apply_to_output = apply_to_output
@@ -164,15 +162,12 @@ class _OPTIONAL_PresidioPIIMasking(CustomGuardrail):
         presidio_analyzer_api_base: Optional[str] = None,
         presidio_anonymizer_api_base: Optional[str] = None,
     ):
-        self.presidio_analyzer_api_base: Optional[
-            str
-        ] = presidio_analyzer_api_base or get_secret(
-            "PRESIDIO_ANALYZER_API_BASE", None
+        self.presidio_analyzer_api_base: Optional[str] = (
+            presidio_analyzer_api_base or get_secret("PRESIDIO_ANALYZER_API_BASE", None)
         )  # type: ignore
-        self.presidio_anonymizer_api_base: Optional[
-            str
-        ] = presidio_anonymizer_api_base or litellm.get_secret(
-            "PRESIDIO_ANONYMIZER_API_BASE", None
+        self.presidio_anonymizer_api_base: Optional[str] = (
+            presidio_anonymizer_api_base
+            or litellm.get_secret("PRESIDIO_ANONYMIZER_API_BASE", None)
         )  # type: ignore
 
         if self.presidio_analyzer_api_base is None:
@@ -741,6 +736,18 @@ class _OPTIONAL_PresidioPIIMasking(CustomGuardrail):
 
         For multiple messages in /chat/completions, we'll need to call them in parallel.
         """
+        # Respect the configured event hook. In `logging_only` mode (and any config that
+        # excludes pre_call) the live request must not be masked - masking is applied to a
+        # copy at logging time via `async_logging_hook`. Without this gate the request sent
+        # to the model would carry anonymization tokens and the response would echo them.
+        if (
+            self.should_run_guardrail(
+                data=data,
+                event_type=GuardrailEventHooks.pre_call,
+            )
+            is not True
+        ):
+            return data
 
         try:
             content_safety = data.get("content_safety", None)
@@ -750,9 +757,9 @@ class _OPTIONAL_PresidioPIIMasking(CustomGuardrail):
             if messages is None:
                 return data
             tasks = []
-            task_mappings: List[Tuple[int, Optional[int]]] = (
-                []
-            )  # Track (message_index, content_index) for each task
+            task_mappings: List[
+                Tuple[int, Optional[int]]
+            ] = []  # Track (message_index, content_index) for each task
 
             for msg_idx, m in enumerate(messages):
                 content = m.get("content", None)
@@ -796,9 +803,9 @@ class _OPTIONAL_PresidioPIIMasking(CustomGuardrail):
                 if content is None:
                     continue
                 if isinstance(content, str) and content_idx_optional is None:
-                    messages[msg_idx][
-                        "content"
-                    ] = r  # replace content with redacted string
+                    messages[msg_idx]["content"] = (
+                        r  # replace content with redacted string
+                    )
                 elif isinstance(content, list) and content_idx_optional is not None:
                     messages[msg_idx]["content"][content_idx_optional]["text"] = r
 
@@ -853,9 +860,9 @@ class _OPTIONAL_PresidioPIIMasking(CustomGuardrail):
         ):  # /chat/completions requests
             messages: Optional[List] = kwargs.get("messages", None)
             tasks = []
-            task_mappings: List[Tuple[int, Optional[int]]] = (
-                []
-            )  # Track (message_index, content_index) for each task
+            task_mappings: List[
+                Tuple[int, Optional[int]]
+            ] = []  # Track (message_index, content_index) for each task
 
             if messages is None:
                 return kwargs, result
@@ -904,9 +911,9 @@ class _OPTIONAL_PresidioPIIMasking(CustomGuardrail):
                 if content is None:
                     continue
                 if isinstance(content, str) and content_idx_optional is None:
-                    messages[msg_idx][
-                        "content"
-                    ] = r  # replace content with redacted string
+                    messages[msg_idx]["content"] = (
+                        r  # replace content with redacted string
+                    )
                 elif isinstance(content, list) and content_idx_optional is not None:
                     messages[msg_idx]["content"][content_idx_optional]["text"] = r
 
@@ -1432,7 +1439,7 @@ class _OPTIONAL_PresidioPIIMasking(CustomGuardrail):
         try:
             verbose_proxy_logger.debug(print_statement)
             if litellm.set_verbose:
-                print(print_statement)  # noqa
+                print(print_statement)  # noqa: T201
         except Exception:
             pass
 

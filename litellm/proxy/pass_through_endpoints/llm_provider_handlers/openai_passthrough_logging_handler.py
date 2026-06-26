@@ -275,7 +275,7 @@ class OpenAIPassthroughLoggingHandler(BasePassthroughLoggingHandler):
         return litellm_model_response, response_cost
 
     @staticmethod
-    def openai_passthrough_handler(  # noqa: PLR0915
+    def openai_passthrough_handler(
         httpx_response: httpx.Response,
         response_body: dict,
         logging_obj: LiteLLMLoggingObj,
@@ -478,7 +478,9 @@ class OpenAIPassthroughLoggingHandler(BasePassthroughLoggingHandler):
             endpoint_type = (
                 "chat_completions"
                 if is_chat_completions
-                else "image_generation" if is_image_generation else "image_editing"
+                else "image_generation"
+                if is_image_generation
+                else "image_editing"
             )
             verbose_proxy_logger.debug(
                 f"OpenAI passthrough cost tracking - Endpoint: {endpoint_type}, Model: {model}, Cost: ${response_cost:.6f}"

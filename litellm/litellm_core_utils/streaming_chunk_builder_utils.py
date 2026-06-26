@@ -209,13 +209,13 @@ class ChunkProcessor:
         )
         return response
 
-    def get_combined_tool_content(  # noqa: PLR0915
+    def get_combined_tool_content(
         self, tool_call_chunks: List[Dict[str, Any]]
     ) -> List[ChatCompletionMessageToolCall]:
         tool_calls_list: List[ChatCompletionMessageToolCall] = []
-        tool_call_map: Dict[int, Dict[str, Any]] = (
-            {}
-        )  # Map to store tool calls by index
+        tool_call_map: Dict[
+            int, Dict[str, Any]
+        ] = {}  # Map to store tool calls by index
 
         for chunk in tool_call_chunks:
             choices = chunk["choices"]
@@ -604,6 +604,8 @@ class ChunkProcessor:
                 usage_chunk = chunk._hidden_params.get("usage", None)
 
             if usage_chunk is not None:
+                if isinstance(usage_chunk, dict):
+                    usage_chunk = Usage(**usage_chunk)
                 usage_chunk_dict = self._usage_chunk_calculation_helper(usage_chunk)
                 if (
                     usage_chunk_dict["prompt_tokens"] is not None
@@ -718,15 +720,16 @@ class ChunkProcessor:
             returned_usage.prompt_tokens = prompt_tokens or token_counter(
                 model=model, messages=messages
             )
-        except (
-            Exception
-        ):  # don't allow this failing to block a complete streaming response from being returned
+        except Exception:  # don't allow this failing to block a complete streaming response from being returned
             print_verbose("token_counter failed, assuming prompt tokens is 0")
             returned_usage.prompt_tokens = 0
-        returned_usage.completion_tokens = completion_tokens or token_counter(
-            model=model,
-            text=completion_output,
-            count_response_tokens=True,  # count_response_tokens is a Flag to tell token counter this is a response, No need to add extra tokens we do for input messages
+        returned_usage.completion_tokens = (
+            completion_tokens
+            or token_counter(
+                model=model,
+                text=completion_output,
+                count_response_tokens=True,  # count_response_tokens is a Flag to tell token counter this is a response, No need to add extra tokens we do for input messages
+            )
         )
         returned_usage.total_tokens = (
             returned_usage.prompt_tokens + returned_usage.completion_tokens

@@ -271,7 +271,7 @@ def supports_response_json_schema(model: str) -> bool:
 
     # Gemini 2.0+ and 2.5+ models support responseJsonSchema
     # Pattern matches: gemini-2.0-*, gemini-2.5-*, gemini-3-*, etc.
-    gemini_2_plus_pattern = re.compile(r"gemini-([2-9]|[1-9]\d+)\.")
+    gemini_2_plus_pattern = re.compile(r"gemini-(?:[2-9]|[1-9]\d+)(?:\.|\-)")
 
     return bool(gemini_2_plus_pattern.search(model_lower))
 
@@ -779,7 +779,8 @@ def filter_schema_fields(
             result[key] = filter_schema_fields(value, valid_fields, processed)
         elif key == "anyOf" and isinstance(value, list):
             result[key] = [
-                filter_schema_fields(item, valid_fields, processed) for item in value  # type: ignore
+                filter_schema_fields(item, valid_fields, processed)
+                for item in value  # type: ignore
             ]
         else:
             result[key] = value

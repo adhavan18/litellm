@@ -342,6 +342,7 @@ def test_ui_view_request_response_forbids_non_admin_without_db(client, monkeypat
 
 ignored_keys = [
     "request_id",
+    "metadata.litellm_call_id",
     "session_id",
     "startTime",
     "endTime",
@@ -359,6 +360,8 @@ ignored_keys = [
     "metadata.additional_usage_values.cache_read_input_tokens",
     "metadata.additional_usage_values.inference_geo",
     "metadata.additional_usage_values.speed",
+    "metadata.additional_usage_values.service_tier",
+    "metadata.additional_usage_values.iterations",
     "metadata.litellm_overhead_time_ms",
     "metadata.cost_breakdown",
     "metadata.user_api_key",

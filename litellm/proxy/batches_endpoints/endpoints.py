@@ -58,7 +58,7 @@ router = APIRouter()
     dependencies=[Depends(user_api_key_auth)],
     tags=["batch"],
 )
-async def create_batch(  # noqa: PLR0915
+async def create_batch(
     request: Request,
     fastapi_response: Response,
     provider: Optional[str] = None,
@@ -282,7 +282,8 @@ async def create_batch(  # noqa: PLR0915
             else:
                 # SCENARIO 3: Fallback to custom_llm_provider (uses env variables)
                 response = await litellm.acreate_batch(
-                    custom_llm_provider=custom_llm_provider, **_create_batch_data  # type: ignore
+                    custom_llm_provider=custom_llm_provider,
+                    **_create_batch_data,  # type: ignore
                 )
 
         ### CALL HOOKS ### - modify outgoing data
@@ -343,7 +344,7 @@ async def create_batch(  # noqa: PLR0915
     dependencies=[Depends(user_api_key_auth)],
     tags=["batch"],
 )
-async def retrieve_batch(  # noqa: PLR0915
+async def retrieve_batch(
     request: Request,
     fastapi_response: Response,
     user_api_key_dict: UserAPIKeyAuth = Depends(user_api_key_auth),
@@ -523,7 +524,8 @@ async def retrieve_batch(  # noqa: PLR0915
                 or "openai"
             )
             response = await litellm.aretrieve_batch(
-                custom_llm_provider=custom_llm_provider, **data  # type: ignore
+                custom_llm_provider=custom_llm_provider,
+                **data,  # type: ignore
             )
 
         # FIX: Update the database with the latest state from provider
@@ -735,7 +737,9 @@ async def list_batches(
 
         ## POST CALL HOOKS ###
         _response = await proxy_logging_obj.post_call_success_hook(
-            data=data, user_api_key_dict=user_api_key_dict, response=response  # type: ignore
+            data=data,
+            user_api_key_dict=user_api_key_dict,
+            response=response,  # type: ignore
         )
         if _response is not None and type(response) is type(_response):
             response = _response

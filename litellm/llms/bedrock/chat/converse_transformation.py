@@ -1963,7 +1963,9 @@ class AmazonConverseConfig(BaseConfig):
 
         return message, returned_finish_reason
 
-    def _translate_message_content(self, content_blocks: List[ContentBlock]) -> Tuple[
+    def _translate_message_content(
+        self, content_blocks: List[ContentBlock]
+    ) -> Tuple[
         str,
         List[ChatCompletionToolCallChunk],
         Optional[List[BedrockConverseReasoningContentBlock]],
@@ -2189,7 +2191,7 @@ class AmazonConverseConfig(BaseConfig):
         real_tools = [t for i, t in enumerate(tools) if i not in json_tool_indices]
         return real_tools if real_tools else None
 
-    def _transform_response(  # noqa: PLR0915
+    def _transform_response(
         self,
         model: str,
         response: httpx.Response,

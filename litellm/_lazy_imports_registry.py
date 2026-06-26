@@ -260,7 +260,6 @@ LLM_CONFIG_NAMES = (
     "SambaNovaEmbeddingConfig",
     "FireworksAIConfig",
     "FireworksAITextCompletionConfig",
-    "FireworksAIAudioTranscriptionConfig",
     "FireworksAIEmbeddingConfig",
     "FriendliaiChatConfig",
     "JinaAIEmbeddingConfig",
@@ -306,6 +305,7 @@ LLM_CONFIG_NAMES = (
     "GigaChatConfig",
     "GigaChatEmbeddingConfig",
     "DashScopeChatConfig",
+    "ModelScopeChatConfig",
     "MoonshotChatConfig",
     "DockerModelRunnerChatConfig",
     "V0ChatConfig",
@@ -1026,10 +1026,6 @@ _LLM_CONFIGS_IMPORT_MAP = {
         ".llms.fireworks_ai.completion.transformation",
         "FireworksAITextCompletionConfig",
     ),
-    "FireworksAIAudioTranscriptionConfig": (
-        ".llms.fireworks_ai.audio_transcription.transformation",
-        "FireworksAIAudioTranscriptionConfig",
-    ),
     "FireworksAIEmbeddingConfig": (
         ".llms.fireworks_ai.embed.fireworks_ai_transformation",
         "FireworksAIEmbeddingConfig",
@@ -1160,6 +1156,10 @@ _LLM_CONFIGS_IMPORT_MAP = {
     "DashScopeChatConfig": (
         ".llms.dashscope.chat.transformation",
         "DashScopeChatConfig",
+    ),
+    "ModelScopeChatConfig": (
+        ".llms.modelscope.chat.transformation",
+        "ModelScopeChatConfig",
     ),
     "MoonshotChatConfig": (".llms.moonshot.chat.transformation", "MoonshotChatConfig"),
     "DockerModelRunnerChatConfig": (
