@@ -639,10 +639,15 @@ class VertexGeminiConfig(VertexAIBaseConfig, BaseConfig):
         googleMaps: Optional[dict] = None
         google_maps_retrieval_config: Optional[dict] = None
         computerUse: Optional[dict] = None
-        # remove 'additionalProperties' from tools
-        value = _remove_additional_properties(value)
+        # Deep-copy before stripping so that if the router falls back to another
+        # provider (e.g. OpenAI) it still sees the original schemas, including
+        # 'additionalProperties: false' which OpenAI strict mode requires.
+        # See: https://github.com/BerriAI/litellm/issues/31343
+        value = deepcopy(value)
+        # remove 'additionalProperties' from tools (not supported by Gemini/Vertex)
+        _remove_additional_properties(value)
         # remove 'strict' from tools
-        value = _remove_strict_from_schema(value)
+        _remove_strict_from_schema(value)
 
         for tool in value:
             openai_function_object: Optional[ChatCompletionToolParamFunctionChunk] = (
