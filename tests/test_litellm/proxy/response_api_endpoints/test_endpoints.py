@@ -55,6 +55,30 @@ class TestResponsesAPIEndpoints(unittest.TestCase):
 
         assert response.status_code in [200, 401, 500]
 
+    @patch("litellm.proxy.proxy_server.llm_router")
+    @patch("litellm.proxy.proxy_server.user_api_key_auth")
+    def test_responses_route_missing_input_returns_400(self, mock_auth, mock_router):
+        """
+        A request body that omits `input` must return a 400 naming the missing
+        field, not a raw 500 from aresponses()'s required positional argument.
+        """
+        mock_auth.return_value = MagicMock(
+            token="test_token",
+            user_id="test_user",
+            team_id=None,
+        )
+
+        client = TestClient(app)
+
+        response = client.post(
+            "/v1/responses",
+            json={"model": "gpt-4o"},
+            headers={"Authorization": "Bearer sk-1234"},
+        )
+
+        assert response.status_code == 400
+        assert "input" in response.json()["detail"].lower()
+
     @pytest.mark.asyncio
     @patch("litellm.proxy.proxy_server.llm_router")
     @patch("litellm.proxy.proxy_server.user_api_key_auth")
